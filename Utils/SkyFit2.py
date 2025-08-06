@@ -4459,30 +4459,8 @@ class PlateTool(QtWidgets.QMainWindow):
             img_handle = detectInputTypeFile(self.input_path, self.config, beginning_time=beginning_time, 
                                              flipud=self.flipud)
         
-        # Load given data from a folder
-        elif os.path.isdir(self.input_path):
-
-            # Detect input file type and load appropriate input plugin
-            img_handle = detectInputTypeFolder(self.dir_path, self.config, beginning_time=beginning_time, \
-                use_fr_files=self.use_fr_files, flipud=self.flipud)
-
-            # If the data was not being able to load from the folder, choose a file to load
-            if img_handle is None:
-                self.input_path = QtWidgets.QFileDialog.getOpenFileName(self, "Select image/video file to open",
-                    self.dir_path, "All readable files (*.fits *.bin *.mp4 *.avi *.mkv *.vid *.png *.jpg *.bmp *.nef *.tif);;" + \
-                                   "All files (*);;" + \
-                                   "FF and FR Files (*.fits;*.bin);;" + \
-                                   "Video Files (*.mp4 *.avi *.mkv);;" + \
-                                   "VID Files (*.vid);;" + \
-                                   "FITS Files (*.fits);;" + \
-                                   "BIN Files (*.bin);;" + \
-                                   "Image Files (*.png *.jpg *.bmp *.nef *.tif)")[0]
-
-
-        # If no previous ways of opening data was successful, open a file
-        if img_handle is None:
-            img_handle = detectInputTypeFile(self.input_path, self.config, beginning_time=beginning_time, 
-                                             flipud=self.flipud)
+        else:
+            raise FileNotFoundError("input file cannot be found, it needs to be a file")
 
 
         self.img_handle = img_handle
@@ -4834,7 +4812,7 @@ class PlateTool(QtWidgets.QMainWindow):
             initial_file = self.dir_path
 
         dark_file = QtWidgets.QFileDialog.getOpenFileName(self, "Select the dark frame file", initial_file,
-                                                      "Image files (*.png *.jpg *.bmp *.nef *.cr2);;All files (*)")[0]
+                                                      "Image files (*.png *.jpg *.bmp *.nef *.cr2 *.cr3 *.dng);;All files (*)")[0]
 
         if not dark_file:
             return False, None

@@ -748,7 +748,7 @@ def loadDark(dir_path, file_name, dtype=None, byteswap=False):
     try:
 
         # If the image is a raw file, load it as such
-        if file_name.lower().endswith(".nef") or file_name.lower().endswith(".cr2"):
+        if file_name.lower().endswith(".nef") or file_name.lower().endswith(".cr2") or file_name.lower().endswith(".cr3") or file_name.lower().endswith(".dng"):
 
             # Load the dark from a raw file
             dark = loadRaw(os.path.join(dir_path, file_name))
