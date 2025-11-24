@@ -12,6 +12,8 @@ import scipy.misc
 import scipy.ndimage
 import cv2
 
+from astropy.io import fits
+
 from PIL import Image, ImageFont, ImageDraw 
 import datetime
 
@@ -136,6 +138,9 @@ def loadImage(img_path, flatten=-1):
     Keyword arguments:
         flatten: [int] Convert color image to grayscale if -1. -1 by default.
     """
+
+    if img_path.lower().endswith('.fits') or img_path.lower().endswith('.fits.gz'):
+        return fits.open(img_path)[0].data
 
     if USING_SCIPY_IMREAD:
         img = imread(img_path, flatten)
@@ -711,6 +716,7 @@ def applyFlat(img, flat_struct):
 
     # Check that the input image and the flat have the same dimensions, otherwise do not apply it
     if img.shape != flat_struct.flat_img.shape:
+        print('PROBLEM: the flat does NOT have the same size as the image')
         return img
 
     input_type = img.dtype
