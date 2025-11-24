@@ -193,7 +193,7 @@ def loadConfigFromDirectory(cml_args_config, dir_path):
 
             # Locate all files in the data directory that end with '.config'
             config_files = [file_name for file_name in os.listdir(dir_path) \
-                if (file_name.endswith('.config') or file_name.endswith('dfnstation.cfg')) \
+                if (file_name.endswith('.config') or file_name.endswith('dfnstation.cfg') or file_name.endswith('.json')) \
                 and not (file_name == 'bak.config')]
 
             # If there is exactly one config file, use it
@@ -782,24 +782,7 @@ def parse(path, strict=True):
 
     """
 
-    delimiter = ";"
 
-    try:
-        # Python 3
-        parser = RawConfigParser(inline_comment_prefixes=(delimiter), strict=strict)
-
-        parser.read(path, encoding='utf-8')
-
-    except:
-        # Python 2
-        parser = RawConfigParser()
-
-        parser.read(path)
-
-
-    # Remove inline comments
-    removeInlineComments(parser, delimiter)
-    
     config = Config()
 
     # Store parsed config file name
@@ -808,11 +791,27 @@ def parse(path, strict=True):
 
     # Parse an RMS config file
     if os.path.basename(path).endswith('.config'):
+        delimiter = ";"
+
+        parser = RawConfigParser(inline_comment_prefixes=(delimiter), strict=strict)
+        parser.read(path, encoding='utf-8')
+
+        # Remove inline comments
+        removeInlineComments(parser, delimiter)
+
         parseConfigFile(config, parser)
 
     # Parse a DFN config file
     elif os.path.basename(path) == 'dfnstation.cfg':
+        delimiter = ";"
+        parser = RawConfigParser(inline_comment_prefixes=(delimiter), strict=strict)
+        parser.read(path, encoding='utf-8')
+
         parseDFNStation(config, parser)
+
+    # Parse a Nocterra config file
+    elif os.path.basename(path).endswith('.json'):
+        parseNocterraJsonConfig(config, path)
 
     else:
         raise RuntimeError('Unknown config file name: {}'.format(os.path.basename(path)))
@@ -820,7 +819,7 @@ def parse(path, strict=True):
 
     # Disable upload if the default station name is used
     if config.stationID == "XX0001":
-        print("Disabled upload because the default station code is used!")
+        #print("Disabled upload because the default station code is used!")
         config.upload_enabled = False
     
 
@@ -842,6 +841,34 @@ def parseConfigFile(config, parser):
     parseStack(config, parser)
     parseTimelapse(config, parser)
     parseColors(config, parser)
+
+
+def parseNocterraJsonConfig(config, path):
+    import json
+    with open(path, 'r') as f:
+        d = json.load(f)
+
+    config.stationID = d['config']['CAM_ID']
+    config.stationID = d['config']['LOC_ID']
+
+    config.latitude = d['config']['latitude']
+    config.longitude = d['config']['longitude']
+    config.elevation = d['config']['altitude']
+
+    config.fov_h = 245
+    config.fov_w = 360
+    config.width = int(d['raw_cfg']['size'][0] /2)
+    config.height = int(d['raw_cfg']['size'][1] /2)
+
+    config.fps = 1
+    config.gamma = 1
+    config.bit_depth = 16
+    config.catalog_mag_limit = 5.0
+
+    config.star_catalog_path = 'Catalogs'
+    config.star_catalog_file = 'BSC5'
+    config.platepar_name = 'platepar_cmn2010.cal'
+    config.deinterlace_order = -2
 
 
 def parseDFNStation(config, parser):
@@ -1693,9 +1720,11 @@ def parseCalibration(config, parser):
 
     if parser.has_option(section, "use_flat"):
         config.use_flat = parser.getboolean(section, "use_flat")
+        print(f'use flat read to: {config.use_flat}')
 
     if parser.has_option(section, "flat_file"):
         config.flat_file = parser.get(section, "flat_file")
+        print(f'flat file read to: {config.flat_file}')
 
     if parser.has_option(section, "flat_min_imgs"):
         config.flat_min_imgs = parser.getint(section, "flat_min_imgs")
