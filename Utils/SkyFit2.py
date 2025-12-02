@@ -42,7 +42,7 @@ from RMS.Misc import decimalDegreesToSexHours
 from RMS.Routines.AddCelestialGrid import updateRaDecGrid, updateAzAltGrid
 from RMS.Routines.CustomPyqtgraphClasses import *
 from RMS.Routines.GreatCircle import fitGreatCircle, greatCircle, greatCirclePhase
-from RMS.Routines.Image import signalToNoise, applyDark, applyFlat
+from RMS.Routines.Image import signalToNoise, applyDark, applyFlat, determine_dark_from_dead_area
 from RMS.Routines.MaskImage import getMaskFile
 from RMS.Routines import RollingShutterCorrection
 from RMS.Routines.MaskImage import loadMask, MaskStructure, getMaskFile
@@ -446,7 +446,7 @@ class PairedStars(object):
 class PlateTool(QtWidgets.QMainWindow):
     def __init__(self, input_path, config, beginning_time=None, fps=None, gamma=None, use_fr_files=False,
         geo_points_input=None, startUI=True, mask=None, nobg=False, peribg=False, flipud=False,
-        flatbiassub=False):
+        flatbiassub=False, darkfromdeadarea=False):
         """ SkyFit interactive window.
 
         Arguments:
@@ -469,6 +469,7 @@ class PlateTool(QtWidgets.QMainWindow):
                 coloured mask instead of the avepixel. False by default.
             flipud: [bool] Flip the image upside down. False by default.
             flatbiassub: [bool] Subtract flat and bias frames. False by default.
+            darkfromdeadarea: [bool] Create synthetic dark from dead area. False by default.
         """
 
         super(PlateTool, self).__init__()
@@ -502,6 +503,9 @@ class PlateTool(QtWidgets.QMainWindow):
 
         # Store the flat and bias subtraction flag
         self.flatbiassub = flatbiassub
+
+        # Store the dark from dead area flag
+        self.darkfromdeadarea = darkfromdeadarea
 
         # Extract the directory path if a file was given
         if os.path.isfile(self.dir_path):
@@ -611,6 +615,37 @@ class PlateTool(QtWidgets.QMainWindow):
         # Update the FPS if it's forced
         self.setFPS()
 
+        # Generate synthetic dark from dead area if requested
+        if self.darkfromdeadarea:
+            print("Generating synthetic dark from dead area...")
+            try:
+                # Load a chunk to get the image data
+                chunk = self.img_handle.loadChunk()
+                
+                # Use the avepixel or maxpixel as the base image
+                if hasattr(chunk, 'avepixel'):
+                    image = chunk.avepixel.T
+                elif hasattr(chunk, 'maxpixel'):
+                    image = chunk.maxpixel.T
+                else:
+                    print("Warning: Could not find suitable image for dark generation")
+                    image = None
+                
+                if image is not None:
+                    # Generate the synthetic dark
+                    self.dark = determine_dark_from_dead_area(image)
+                    print("Synthetic dark generated successfully!")
+                    
+                    # Apply the dark to the flat if flatbiassub is also set
+                    if self.flatbiassub and (self.flat_struct is not None):
+                        print("Applying synthetic dark to flat...")
+                        self.flat_struct.applyDark(self.dark)
+                        
+            except Exception as e:
+                print("Failed to generate synthetic dark from dead area:")
+                print(repr(e))
+                print(*traceback.format_exception(*sys.exc_info()))
+
 
         ###################################################################################################
 
@@ -662,6 +697,14 @@ class PlateTool(QtWidgets.QMainWindow):
         # INIT WINDOW
         if startUI:
             self.setupUI()
+            
+            # If synthetic dark was generated from dead area, apply it to the image items
+            if self.darkfromdeadarea and (self.dark is not None):
+                print("Applying synthetic dark to image items...")
+                self.img.dark = self.dark
+                self.img_zoom.dark = self.dark
+                self.img_zoom.reloadImage()
+                self.img.reloadImage()
 
 
     def setFPS(self):
@@ -2080,6 +2123,7 @@ class PlateTool(QtWidgets.QMainWindow):
         fixed_vignetting = None
         if self.flat_struct is not None:
             fixed_vignetting = 0.0
+            print('Vignetting set to ZERO because we are using a flat')
 
         elif self.platepar.vignetting_fixed:
             fixed_vignetting = self.platepar.vignetting_coeff
@@ -2283,7 +2327,7 @@ class PlateTool(QtWidgets.QMainWindow):
 
             ### PLOT MAG DIFFERENCE BY RADIUS
 
-            img_diagonal = np.hypot(self.platepar.X_res/2, self.platepar.Y_res/2)
+            img_diagonal = self.platepar.Y_res/2
 
             # Plot radius from centre vs. fit residual (including vignetting)
             ax_r.scatter(radius_list, self.photom_fit_resids, s=10, c='b', alpha=0.5, zorder=3)
@@ -2321,10 +2365,14 @@ class PlateTool(QtWidgets.QMainWindow):
 
             ax_r.set_xlim(0, img_diagonal)
 
+            # for all-sky lenses this makes more sense
+            ax_r.invert_xaxis()
+
             ### PLOT MAG DIFFERENCE BY ELEVATION
 
             # Plot elevation vs. fit residual
-            ax_e.scatter(elevation_list, self.photom_fit_resids, s=10, c='b', alpha=0.5, zorder=3)
+            ax_e.scatter(elevation_list, self.photom_fit_resids, s=10, c='b', alpha=0.5, zorder=3, 
+                        label='')
 
             # Compute the fit residuals without extinction
             fit_resids_noext = \
@@ -4812,7 +4860,7 @@ class PlateTool(QtWidgets.QMainWindow):
             initial_file = self.dir_path
 
         dark_file = QtWidgets.QFileDialog.getOpenFileName(self, "Select the dark frame file", initial_file,
-                                                      "Image files (*.png *.jpg *.bmp *.nef *.cr2 *.cr3 *.dng);;All files (*)")[0]
+                                                      "Image files (*.png *.jpg *.bmp *.nef *.cr2 *.cr3 *.dng *.fits *.fits.gz);;All files (*)")[0]
 
         if not dark_file:
             return False, None
@@ -6720,7 +6768,7 @@ if __name__ == '__main__':
                             help='Path to the folder with FF or image files, path to a video file, or to a state file.'
                                  ' If images or videos are given, their names must be in the format: YYYYMMDD_hhmmss.uuuuuu')
 
-    arg_parser.add_argument('-c', '--config', nargs=1, metavar='CONFIG_PATH', type=str,
+    arg_parser.add_argument('-c', '--config', nargs=1, metavar='CONFIG_PATH', type=str, default='.',
                             help="Path to a config file which will be used instead of the default one."
                                  " To load the .config file in the given data directory, write '.' (dot).")
 
@@ -6759,10 +6807,12 @@ if __name__ == '__main__':
 
     arg_parser.add_argument('-m', '--mask', metavar='MASK_PATH', type=str,
                             help="Path to a mask file which will be applied to the star catalog")
-    
+
     arg_parser.add_argument('--flatbiassub', action="store_true", \
         help="Subtract the bias from the flat. False by default.")
 
+    arg_parser.add_argument('--darkfromdeadarea', action="store_true", \
+        help="Create a synthetic dark image from the dead area of the image. False by default.")
 
 
     # Parse the command line arguments
@@ -6833,9 +6883,19 @@ if __name__ == '__main__':
             dir_path = os.path.dirname(input_path)
         else:
             dir_path = input_path
-
-        # Load the config file
-        config = cr.loadConfigFromDirectory(cml_args.config, dir_path)
+        
+        cfg_found = False
+        if os.path.isfile(input_path) and input_path.lower().endswith('.dng'):
+            # look for a config file that nearly has the same name
+            config_file = input_path.replace('_DNG.dng', '_MTA.json')
+            if os.path.isfile(config_file):
+                print(f'found {config_file}')
+                config = cr.loadConfigFromDirectory([config_file], dir_path)
+                cfg_found = True
+        
+        if not cfg_found:
+            # Load the config file the normal way
+            config = cr.loadConfigFromDirectory(cml_args.config, dir_path)
 
 
         if cml_args.mask is not None:
@@ -6863,7 +6923,7 @@ if __name__ == '__main__':
         plate_tool = PlateTool(input_path, config, beginning_time=beginning_time, fps=cml_args.fps, \
             gamma=cml_args.gamma, use_fr_files=cml_args.fr, geo_points_input=cml_args.geopoints,
             mask=mask, nobg=cml_args.nobg, peribg=cml_args.peribg, flipud=cml_args.flipud, 
-            flatbiassub=cml_args.flatbiassub)
+            flatbiassub=cml_args.flatbiassub, darkfromdeadarea=cml_args.darkfromdeadarea)
 
 
     # Run the GUI app
