@@ -809,6 +809,51 @@ def applyDark(img, dark_img):
     return img
 
 
+def determine_dark_from_dead_area(image):
+    """
+    Creates an image filled with the median value from corner regions.
+    
+    Parameters:
+    -----------
+    image : numpy.ndarray
+        2D monochrome image
+        
+    Returns:
+    --------
+    numpy.ndarray
+        Image of same shape and dtype as input, filled with median corner value
+    """
+    # Get dimensions
+    height, width = image.shape
+    
+    # Find shortest
+    shortest = min(height, width)
+    
+    # Calculate a, rounded down to nearest even integer
+    a = int(shortest * (1-(2**0.5)/2))
+    if a % 2 != 0:
+        a -= 1
+    
+    # Extract pixels from 4 corners (a x a squares)
+    top_left = image[:a, :a]
+    top_right = image[:a, -a:]
+    bottom_left = image[-a:, :a]
+    bottom_right = image[-a:, -a:]
+    
+    # Combine all corner pixels and calculate median
+    all_corner_pixels = np.concatenate([
+        top_left.flatten(),
+        top_right.flatten(),
+        bottom_left.flatten(),
+        bottom_right.flatten()
+    ])
+    
+    median_value = int(np.median(all_corner_pixels))
+    
+    # Create output image filled with median value
+    output_image = np.full(image.shape, median_value, dtype=image.dtype)
+    
+    return output_image
 
 
 
