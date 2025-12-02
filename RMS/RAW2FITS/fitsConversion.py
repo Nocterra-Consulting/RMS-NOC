@@ -58,7 +58,10 @@ except ImportError:
     import netPbm
     RAW_HANDLING_LIB = 'DCRAW'
     
-from RMS.RAW2FITS import dfn_utils
+try:
+    from RMS.RAW2FITS import dfn_utils
+except ImportError:
+    import dfn_utils
 
 
 # global static variables

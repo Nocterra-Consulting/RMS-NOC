@@ -264,20 +264,20 @@ class InputTypeRaw(InputType):
         ifile = os.path.join(self.dir_path, self.image_file)
             
         raw_exts = ['nef', 'cr2', 'cr3', 'dng']
-        fits_exts = ['fits', 'fit']
+        fits_exts = ['fits', 'fit', 'fits.gz', 'fit.gz']
         if self.image_file.lower().split('.')[-1] in raw_exts:
             raw_hdu = fitsConversion.raw2fits(ifile)
-            print('loaded ' + self.image_file + ' using fitsConversion')
-        elif self.image_file.lower().split('.')[-1] in fits_exts:
-            raw_hdu = fits.open(f)[0]
+            print('loaded ' + self.image_file + ' using fitsConversion')        
+            debayered_hdu = fitsConversion.de_Bayer(raw_hdu, color_code='green2x2')
+            print('De-Bayered the array by binning green pixels together')
+            frame = debayered_hdu.data
+        elif any([self.image_file.lower().endswith(e) for e in fits_exts]):
+            raw_hdu = fits.open(ifile)[0]
             print('loaded ' + self.image_file + ' as raw FITS array')
+            frame = np.flipud(raw_hdu.data)
         else:
-            raise IndexError('supported file types are only: ' + raw_exts + fits_exts)
-        
-        debayered_hdu = fitsConversion.de_Bayer(raw_hdu, color_code='green2x2')
-        print('De-Bayered the array by binning green pixels together')
-        
-        frame = debayered_hdu.data
+            raise IndexError('supported file types are only: ' + str(raw_exts + fits_exts))
+
         
         print('loaded image size: ' + str(np.shape(frame)))
             
@@ -401,7 +401,7 @@ def detectInputTypeFolder(input_dir, config, beginning_time=None, fps=None, skip
     """
 
     ### Find images in the given folder ###
-    img_types = ['.png', '.jpg', '.jpeg', '.bmp', '.fit', '.tif', '.fits']
+    img_types = ['.png', '.jpg', '.jpeg', '.bmp', '.fit', '.tif', '.fits', '.fits.gz', '.fit.gz']
 
     if 'rawpy' in sys.modules:
         img_types += ['.nef', '.cr2','.cr3', '.dng']
