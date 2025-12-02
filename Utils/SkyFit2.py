@@ -48,6 +48,8 @@ from RMS.Routines import RollingShutterCorrection
 from RMS.Routines.MaskImage import loadMask, MaskStructure, getMaskFile
 from RMS.Misc import maxDistBetweenPoints, getRmsRootDir
 
+from astropy.time import Time
+
 import pyximport
 pyximport.install(setup_args={'include_dirs': [np.get_include()]})
 from RMS.Astrometry.CyFunctions import subsetCatalog, equatorialCoordPrecession
@@ -6891,6 +6893,14 @@ if __name__ == '__main__':
             if os.path.isfile(config_file):
                 print(f'found {config_file}')
                 config = cr.loadConfigFromDirectory([config_file], dir_path)
+                
+                # use the opportunity to read the file to get the iamge time
+                with open(config_file, 'r') as f:
+                    json_data = json.load(f)
+                unix_microseconds = json_data['metadata']['FrameWallClock']
+                astropy_time = Time(unix_microseconds/1e6, format='unix')
+                beginning_time = astropy_time.to_datetime()
+                print(f'image time read from json: {astropy_time.isot}')
                 cfg_found = True
         
         if not cfg_found:
