@@ -448,7 +448,7 @@ class PairedStars(object):
 class PlateTool(QtWidgets.QMainWindow):
     def __init__(self, input_path, config, beginning_time=None, fps=None, gamma=None, use_fr_files=False,
         geo_points_input=None, startUI=True, mask=None, nobg=False, peribg=False, flipud=False,
-        flatbiassub=False, darkfromdeadarea=False):
+        flatbiassub=False, darkfromdeadarea=False, flat_path=None):
         """ SkyFit interactive window.
 
         Arguments:
@@ -472,6 +472,7 @@ class PlateTool(QtWidgets.QMainWindow):
             flipud: [bool] Flip the image upside down. False by default.
             flatbiassub: [bool] Subtract flat and bias frames. False by default.
             darkfromdeadarea: [bool] Create synthetic dark from dead area. False by default.
+            flat_path: [str] Path to flat field file to load automatically. None by default.
         """
 
         super(PlateTool, self).__init__()
@@ -508,6 +509,9 @@ class PlateTool(QtWidgets.QMainWindow):
 
         # Store the dark from dead area flag
         self.darkfromdeadarea = darkfromdeadarea
+
+        # Store the flat field path
+        self.flat_path = flat_path
 
         # Extract the directory path if a file was given
         if os.path.isfile(self.dir_path):
@@ -707,6 +711,10 @@ class PlateTool(QtWidgets.QMainWindow):
                 self.img_zoom.dark = self.dark
                 self.img_zoom.reloadImage()
                 self.img.reloadImage()
+            
+            # Automatically load flat field if path was provided
+            if self.flat_path is not None:
+                self.loadFlatFromPath(self.flat_path)
 
 
     def setFPS(self):
@@ -4798,6 +4806,58 @@ class PlateTool(QtWidgets.QMainWindow):
             self.updateDistortion()
 
 
+    def loadFlatFromPath(self, flat_path):
+        """ Load a flat field from a given path without opening a file dialog.
+        
+        Arguments:
+            flat_path: [str] Path to the flat field file.
+            
+        Returns:
+            success: [bool] True if loaded successfully, False otherwise.
+        """
+        
+        # Expand user path (handle ~)
+        flat_path = os.path.expanduser(flat_path)
+        
+        # Check if file exists
+        if not os.path.isfile(flat_path):
+            print("ERROR: Flat field file not found:", flat_path)
+            return False
+        
+        print("Loading flat field from:", flat_path)
+        
+        try:
+            # Load the flat, byteswap the flat if vid file is used or UWO png
+            flat = Image.loadFlat(*os.path.split(flat_path), dtype=self.img.data.dtype,
+                      byteswap=self.img_handle.byteswap)
+            flat.flat_img = np.swapaxes(flat.flat_img, 0, 1)
+
+            print("Flat loaded successfully!")
+            
+        except Exception as e:
+            
+            print("Loading the flat failed with error: " + repr(e))
+            print()
+            print(*traceback.format_exception(*sys.exc_info()))
+            return False
+
+        # Check if the size of the file matches
+        if self.img.data.shape != flat.flat_img.shape:
+            print("ERROR: The size of the flat field does not match the size of the image!")
+            print("  Flat shape:", flat.flat_img.shape)
+            print("  Image shape:", self.img.data.shape)
+            return False
+
+        # Apply the flat to the image items
+        self.flat_struct = flat
+        self.img.flat_struct = self.flat_struct
+        self.img_zoom.flat_struct = self.flat_struct
+        self.img_zoom.reloadImage()
+        self.img.reloadImage()
+        
+        return True
+
+
     def loadFlat(self):
         """ Open a file dialog and ask user to load a flat field. """
 
@@ -6810,6 +6870,9 @@ if __name__ == '__main__':
     arg_parser.add_argument('-m', '--mask', metavar='MASK_PATH', type=str,
                             help="Path to a mask file which will be applied to the star catalog")
 
+    arg_parser.add_argument('--flat', metavar='FLAT_PATH', type=str,
+                            help="Path to a flat field file which will be loaded automatically")
+
     arg_parser.add_argument('--flatbiassub', action="store_true", \
         help="Subtract the bias from the flat. False by default.")
 
@@ -6933,7 +6996,8 @@ if __name__ == '__main__':
         plate_tool = PlateTool(input_path, config, beginning_time=beginning_time, fps=cml_args.fps, \
             gamma=cml_args.gamma, use_fr_files=cml_args.fr, geo_points_input=cml_args.geopoints,
             mask=mask, nobg=cml_args.nobg, peribg=cml_args.peribg, flipud=cml_args.flipud, 
-            flatbiassub=cml_args.flatbiassub, darkfromdeadarea=cml_args.darkfromdeadarea)
+            flatbiassub=cml_args.flatbiassub, darkfromdeadarea=cml_args.darkfromdeadarea, 
+            flat_path=cml_args.flat)
 
 
     # Run the GUI app
