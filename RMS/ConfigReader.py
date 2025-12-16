@@ -849,12 +849,14 @@ def parseNocterraJsonConfig(config, path):
         d = json.load(f)
 
     config.stationID = d['config']['CAM_ID']
-    config.stationID = d['config']['LOC_ID']
+    # RMS doesn't have an existing way of storing a human readable location
+    #config. = d['config']['LOC_ID']
 
     config.latitude = d['config']['latitude']
     config.longitude = d['config']['longitude']
     config.elevation = d['config']['altitude']
 
+    # these do not matter too much, but are a good default for an all-sky lens
     config.fov_h = 245
     config.fov_w = 360
     config.width = int(d['raw_cfg']['size'][0] /2)
@@ -867,7 +869,11 @@ def parseNocterraJsonConfig(config, path):
 
     config.star_catalog_path = 'Catalogs'
     config.star_catalog_file = 'BSC5'
-    config.platepar_name = 'platepar_cmn2010.cal'
+
+    config.platepar_name = os.path.basename(path).replace('_MTA.json', '_CAL.cal')
+    # just to be sure we end up with a cal file
+    if not config.platepar_name.endswith('.cal'):
+        config.platepar_name = 'platepar_cmn2010.cal'
     config.deinterlace_order = -2
 
 

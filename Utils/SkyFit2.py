@@ -4691,9 +4691,7 @@ class PlateTool(QtWidgets.QMainWindow):
 
     def savePlatepar(self):
         """  Save platepar to a file """
-        # If the platepar is new, save it to the working directory
-        if (not self.platepar_file) or (not os.path.isfile(self.platepar_file)):
-            self.platepar_file = os.path.join(self.dir_path, self.config.platepar_name)
+        self.platepar_file = os.path.join(self.dir_path, self.config.platepar_name)
 
         # Save the platepar file
         self.platepar.write(self.platepar_file, fmt=self.platepar_fmt, fov=computeFOVSize(self.platepar))
