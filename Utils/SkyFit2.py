@@ -4667,6 +4667,11 @@ class PlateTool(QtWidgets.QMainWindow):
             platepar.X_res = self.config.width
             platepar.Y_res = self.config.height
 
+
+            # propagate image metadata
+            if self.config.original_image_metadata:
+                platepar.original_image_metadata = self.config.original_image_metadata
+
             # Set the camera gamma from the config file
             platepar.gamma = self.config.gamma
 
@@ -4760,6 +4765,11 @@ class PlateTool(QtWidgets.QMainWindow):
 
         # Set station ID
         self.platepar.station_code = self.config.stationID
+
+
+        # propagate image metadata
+        if self.config.original_image_metadata:
+            self.platepar.original_image_metadata = self.config.original_image_metadata
 
         # Get the FOV centre if the image handle is available so the time can be extracted
         if hasattr(self, 'img_handle'):

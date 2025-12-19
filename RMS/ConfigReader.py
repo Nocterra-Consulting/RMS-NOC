@@ -870,11 +870,14 @@ def parseNocterraJsonConfig(config, path):
     config.star_catalog_path = 'Catalogs'
     config.star_catalog_file = 'BSC5'
 
+    config.original_image_metadata = d
+
     config.platepar_name = os.path.basename(path).replace('_MTA.json', '_CAL.cal')
     # just to be sure we end up with a cal file
     if not config.platepar_name.endswith('.cal'):
         config.platepar_name = 'platepar_cmn2010.cal'
     config.deinterlace_order = -2
+
 
 
 def parseDFNStation(config, parser):
