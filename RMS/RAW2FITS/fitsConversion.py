@@ -156,49 +156,40 @@ def raw2fits(inputfile, crop="",  dark="", flat='', inverseGrayscale=False):
         # Getting the EXIF of raw file with dcraw
         p = subprocess.Popen(["dcraw", "-i", "-v", inputfile], stdout=subprocess.PIPE)
         dcraw_exif = p.communicate()[0].decode('utf-8')
-        
+        dcraw_dict = {}
+        for line in dcraw_exif.splitlines():
+            if ":" in line:
+                key, value = line.split(":", 1)
+                dcraw_dict[key.strip()] = value.strip()
         # Catching the Shutter Speed
-        m = re.search('(?<=Shutter:).*(?=sec)', dcraw_exif)
-        shutterstr = m.group(0).strip()
-        if "/" in shutterstr:
-            shutterplit = m.group(0).strip().split('/')
-            shutter = float(shutterplit[0]) / float(shutterplit[1])
-        else:
+        print(dcraw_dict)
+
+
+
+        shutter = dcraw_dict.get('Shutter Speed', None)
+        if shutter is  None:
+            # TODO: is this a critical issue? Update: yes if exposure isnt 60?
+            # I have fixed this for the R8/700D but the SSC reads incorrectly as the DNG says 'inf' so thats something new...
+            # If this is not used in critical processing then can ignore
             logger.critical('WARNING: exposure time not set properly')
             shutter = 60.0
-
-        m = re.search('(?<=Aperture: f/).*', dcraw_exif)
-        aperture = m.group(0).strip()
-
-        m = re.search('(?<=ISO speed:).*', dcraw_exif)
-        iso = m.group(0).strip()
-
-        m = re.search('(?<=Filename:).*', dcraw_exif)
-        original_file = m.group(0).strip()
-
-        m = re.search('(?<=Focal length: ).*(?=mm)', dcraw_exif)
-        focal = m.group(0).strip()
-
-        m = re.search('(?<=Camera:).*', dcraw_exif)
-        camera = m.group(0).strip()
+        aperture = dcraw_dict.get('Aperture', None).split('f/')[1].strip()
+        iso = dcraw_dict.get('ISO speed', None)
+        original_file = dcraw_dict.get('Filename', None)
+        focal = dcraw_dict.get('Focal length', None).split('mm')[0].strip()
+        camera = dcraw_dict.get('Camera', None)
+        filter_pattern = dcraw_dict.get('Filter pattern', None)
+        image_size = dcraw_dict.get('Image size', None)
+        NAXIS1 = int(image_size.split('x')[0].strip())
+        NAXIS2 = int(image_size.split('x')[1].strip())
+        timestamp = dcraw_dict.get('Timestamp', None)
         
-        m = re.search('(?<=Filter pattern:).*', dcraw_exif)
-        filter_pattern = m.group(0).strip()
-        
-        # Catching the true Image Size
-        # Image size:  7362 x 4920
-        m = re.search('(?<=Image size: ).*', dcraw_exif)
-        dim_list = m.group(0).strip().split('x')
-        NAXIS1 = int(dim_list[0])
-        NAXIS2 = int(dim_list[1])
 
 
         # Catching the Timestamp
-        m = re.search('(?<=Timestamp:).*', dcraw_exif)
-        date1 = m.group(0).split()
+        date1 = timestamp.split()
         months = {'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6, 'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12}
         date = datetime.datetime(int(date1[4]), months[date1[1]], int(date1[2]), int(date1[3].split(':')[0]), int(date1[3].split(':')[1]), int(date1[3].split(':')[2]))
-
         # To use for timestamp/timezone correction FIXME
         #print('WARNING WARNING WARNING WARNING WARNING WARNING WARNING')
         #logger.critical('This is a very special mode for timing correction, do not use in PRODUCTION')

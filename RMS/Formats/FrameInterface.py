@@ -205,14 +205,12 @@ class InputTypeRaw(InputType):
             try:
                 
                 # Extract the DFN timestamp from the file name
-                image_filename_split = self.image_file.split("_")
-                date_str = image_filename_split[1]
-                time_str = image_filename_split[2]
-                datetime_str = date_str + "_" + time_str
-                
+                print(self.image_file)
+                # EC: Updated this based on new naming convention CAMTYPE-ID_LOCID_YYYYMMDD-HHMMSS_EXT.ext
+                datetime_str = self.image_file.split("_")[2]
                 beginning_datetime = datetime.datetime.strptime(
                     datetime_str,
-                    "%Y-%m-%d_%H%M%S")
+                    "%Y%m%d-%H%M%S")
 
                 self.beginning_datetime = beginning_datetime
 

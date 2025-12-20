@@ -6958,9 +6958,10 @@ if __name__ == '__main__':
             dir_path = input_path
         
         cfg_found = False
-        if os.path.isfile(input_path) and input_path.lower().endswith('.dng'):
+        RAW_EXTS = ('.dng', '.cr2', '.cr3')
+        if os.path.isfile(input_path) and input_path.lower().endswith(RAW_EXTS):
             # look for a config file that nearly has the same name
-            config_file = input_path.replace('_DNG.dng', '_MTA.json')
+            config_file = input_path[:-7] + '_MTA.json'
             if os.path.isfile(config_file):
                 print(f'found {config_file}')
                 config = cr.loadConfigFromDirectory([config_file], dir_path)
